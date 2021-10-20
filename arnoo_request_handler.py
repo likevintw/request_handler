@@ -7,6 +7,9 @@ import sys
 import os
 
 
+
+
+
 def create_arnoo_accuracy_tester(
         project_name,
         service_url,
@@ -316,53 +319,28 @@ class ArnooTestHandler (request_handler.RequestHandler):
             message = "{},False".format(image_url)
             return message, time_elapse
 
-    def send_threshold_request_post(self):
-
-        self.time_elapse = None
+    def send_threshold_request_post(self, image_url):
+        self.body["IMAGE"]["src"] = image_url
         start_time = time.perf_counter()
         res = requests.post(
             self.service_url, headers=self.headers, json=self.body)
-        self.time_elapse = time.perf_counter()-start_time
+        time_elapse = time.perf_counter()-start_time
 
         try:
             result = json.loads(res.text)
         except:
-            self.response_message_list.append(
-                "{},No File".format(self.body["IMAGE"]["src"]))
-
-            print(self.headers)
-            print(self.body)
-            print(res.text)
-            return 0
-
-        # if self.monitor:
-            # print(self.headers)
-            # print(self.body)
-
-        # append response time
-        self.response_time_list.append("{},{}".format(
-            result[0]["IMAGE"]["src"],
-            self.time_elapse))
+            message = "{},No Image File".format(image_url)
+            return message, time_elapse
 
         try:
-            if self.monitor:
-                print("{},{}".format(
-                    result[0]["IMAGE"]["src"],
-                    result[0]["OBJECTS"][0]["probability"]
-                ))
-                # print("time_elapse: ", self.time_elapse)
-            # response message
-            self.response_message_list.append("{},{}".format(
+            message = "{},{}".format(
                 result[0]["IMAGE"]["src"],
                 result[0]["OBJECTS"][0]["probability"]
-            ))
+            )
+            return message, time_elapse
         except:
-            if self.monitor:
-                print("{},None".format(result[0]["IMAGE"]["src"]))
-                # print("time_elapse: ", self.time_elapse)
-            # response message
-            self.response_message_list.append(
-                "{},None".format(result[0]["IMAGE"]["src"]))
+            message = "{},False".format(image_url)
+            return message, time_elapse
 
     def send_ROI_accurace_request_post_20210917(self):
 
@@ -766,16 +744,16 @@ class ArnooRequestStructure():
         #             },
         #         }
 
-    def run_arnoo_threshold_test(self, handler):
+    def run_arnoo_threshold_test_backup(self, handler):
         if len(handler.image_url_list) == 0:
             exit("{} is empty".format("handler.image_url_list"))
 
         # test_counter = 0
         for url in handler.image_url_list:
-            handler.body.update({"IMAGE": {"src": url}})
+            # handler.body.update({"IMAGE": {"src": url}})
             # print(handler.body["IMAGE"]["src"])
             # print(handler.body)
-            handler.send_threshold_request_post()
+            handler.send_threshold_request_post(url)
 
             # test_counter += 1
             # if test_counter > 6:
@@ -784,6 +762,35 @@ class ArnooRequestStructure():
         handler.return_counter = len(handler.image_url_list)
         handler.save_accuracy_log()
 
+    def run_arnoo_threshold_test(self, handler):
+        message_list = []
+        time_elapse_list = []
+        for url in handler.image_url_list:
+            message, time_elapse = handler.send_accuracy_test_post(url)
+            message_list.append(message)
+            time_elapse_list.append(time_elapse)
+            if handler.monitor:
+                print(message)
+
+        no_image_number = handler.count_keyword_number(
+            message_list, "No Image")
+        negative_number = handler.count_keyword_number(
+            message_list, "False")
+        positive_number = len(handler.image_url_list) - \
+            no_image_number-negative_number
+        message_list.append("Total: {}".format(len(handler.image_url_list)))
+        message_list.append("Positive: {}".format(positive_number))
+        message_list.append("Negative: {}".format(negative_number))
+        message_list.append("No Image: {}".format(no_image_number))
+        if handler.monitor:
+            print("Total: {}".format(len(handler.image_url_list)))
+            print("Positive: {}".format(positive_number))
+            print("Negative: {}".format(negative_number))
+            print("No Image: {}".format(no_image_number))
+
+        file_path = handler.result_file_path+"/"+handler.project_name+".txt"
+        handler.export_txt(file_path, message_list)
+
     def run_arnoo_mutiple_test(self, handler):
         if len(handler.image_url_list) == 0:
             exit("{} is empty".format("handler.image_url_list"))
@@ -791,13 +798,4 @@ class ArnooRequestStructure():
         # test_counter = 0
         for url in handler.image_url_list:
             handler.body.update({"IMAGE": {"src": url}})
-            # print(handler.body["IMAGE"]["src"])
-            # print(handler.body)
             handler.send_mutiple_request_post()
-
-            # test_counter += 1
-            # if test_counter > 6:
-            #     break
-
-        # handler.return_counter = len(handler.image_url_list)
-        # handler.save_accuracy_log()
