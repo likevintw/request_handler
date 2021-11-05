@@ -7,9 +7,6 @@ import sys
 import os
 
 
-
-
-
 def create_arnoo_accuracy_tester(
         project_name,
         service_url,
@@ -254,7 +251,6 @@ class ArnooTestHandler (request_handler.RequestHandler):
         res = requests.post(
             self.service_url, headers=self.headers, json=self.body)
         self.time_elapse = time.perf_counter()-start_time
-
         try:
             result = json.loads(res.text)
         except:
@@ -295,6 +291,30 @@ class ArnooTestHandler (request_handler.RequestHandler):
             self.response_message_list.append(
                 "{},None".format(result[0]["IMAGE"]["src"]))
 
+    def send_accuracy_test_post_20211105(self, image_url):
+        self.body["IMAGE"]["src"] = image_url
+        start_time = time.perf_counter()
+        res = requests.post(
+            self.service_url, headers=self.headers, json=self.body)
+        time_elapse = time.perf_counter()-start_time
+
+        # check image file exist
+        result = json.loads(res.text)
+        if "FLAME-AI" in str(result):
+            message = "{},No Image File".format(image_url)
+            return message, time_elapse
+
+        # check positive or negative
+        try:
+            message = "{},{}".format(
+                result[0]["IMAGE"]["src"],
+                result[0]["OBJECTS"][0]["probability"]
+            )
+            return message, time_elapse
+        except:
+            message = "{},False".format(image_url)
+            return message, time_elapse
+
     def send_accuracy_test_post(self, image_url):
         self.body["IMAGE"]["src"] = image_url
         start_time = time.perf_counter()
@@ -302,7 +322,6 @@ class ArnooTestHandler (request_handler.RequestHandler):
             self.service_url, headers=self.headers, json=self.body)
         time_elapse = time.perf_counter()-start_time
 
-        # case return []
         try:
             result = json.loads(res.text)
         except:
@@ -325,7 +344,6 @@ class ArnooTestHandler (request_handler.RequestHandler):
         res = requests.post(
             self.service_url, headers=self.headers, json=self.body)
         time_elapse = time.perf_counter()-start_time
-
         try:
             result = json.loads(res.text)
         except:
@@ -674,7 +692,8 @@ class ArnooRequestStructure():
         message_list = []
         time_elapse_list = []
         for url in handler.image_url_list:
-            message, time_elapse = handler.send_accuracy_test_post(url)
+            message, time_elapse = handler.send_accuracy_test_post_20211105(
+                url)
             message_list.append(message)
             time_elapse_list.append(time_elapse)
             if handler.monitor:
